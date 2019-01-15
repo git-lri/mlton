@@ -5,6 +5,8 @@
 
 structure Stream :> STREAM =
 struct
+   open Unsynchronized
+
    datatype 'a str = EVAL of 'a * 'a str ref | UNEVAL of (unit->'a)
 
    type 'a stream = 'a str ref

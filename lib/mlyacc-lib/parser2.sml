@@ -152,33 +152,29 @@ structure LrParser :> LR_PARSER =
           noShift : term -> bool}
 
       local
-         val print = fn s => TextIO.output(TextIO.stdOut,s)
-         val println = fn s => (print s; print "\n")
          val showState = fn (STATE s) => "STATE " ^ (Int.toString s)
       in
         fun printStack(stack: ('a,'b) stack, n: int) =
          case stack
            of (state,_) :: rest =>
-                 (print("\t" ^ Int.toString n ^ ": ");
-                  println(showState state);
+                 (writeln("\t" ^ Int.toString n ^ ": " ^ showState state);
                   printStack(rest, n+1))
             | nil => ()
 
         fun prAction showTerminal
                  (stack as (state,_) :: _, next as (TOKEN (term,_),_), action) =
-             (println "Parse: state stack:";
+             (writeln "Parse: state stack:";
               printStack(stack, 0);
-              print("       state="
-                         ^ showState state
-                         ^ " next="
-                         ^ showTerminal term
-                         ^ " action="
-                        );
-              case action
-                of SHIFT state => println ("SHIFT " ^ (showState state))
-                 | REDUCE i => println ("REDUCE " ^ (Int.toString i))
-                 | ERROR => println "ERROR"
-                 | ACCEPT => println "ACCEPT")
+              writeln( "       state="
+                     ^ showState state
+                     ^ " next="
+                     ^ showTerminal term
+                     ^ " action="
+                     ^ (case action
+                          of SHIFT state => "SHIFT " ^ (showState state)
+                           | REDUCE i => "REDUCE " ^ (Int.toString i)
+                           | ERROR => "ERROR"
+                           | ACCEPT => "ACCEPT")))
         | prAction _ (_,_,action) = ()
      end
 
@@ -324,15 +320,15 @@ fun mkFixError({is_keyword,terms,errtermvalue,
             new : ('a,'b) lexv list, orig : ('a,'b) lexv list}
 
 
-         val showTerms = concat o map (fn TOKEN(t,_) => " " ^ showTerminal t)
+         val showTerms = String.concat o map (fn TOKEN(t,_) => " " ^ showTerminal t)
 
          val printChange = fn c =>
           let val CHANGE {distance,new,orig,pos,...} = c
-          in (print ("{distance= " ^ (Int.toString distance));
-              print (",orig ="); print(showTerms orig);
-              print (",new ="); print(showTerms new);
-              print (",pos= " ^ (Int.toString pos));
-              print "}\n")
+          in writeln ( "{distance= " ^ Int.toString distance
+                     ^ ",orig =" ^ showTerms orig
+                     ^ ",new =" ^ showTerms new
+                     ^ ",pos= " ^ Int.toString pos
+                     ^ "}")
           end
 
         val printChangeList = app printChange
@@ -467,9 +463,9 @@ fun mkFixError({is_keyword,terms,errtermvalue,
 
                   val _ =
                       (if length l > 1 andalso DEBUG2 then
-                           (print "multiple fixes possible; could fix it by:\n";
+                           (writeln "multiple fixes possible; could fix it by:";
                             app print_msg l;
-                            print "chosen correction:\n")
+                            writeln "chosen correction:")
                        else ();
                        print_msg change)
 
