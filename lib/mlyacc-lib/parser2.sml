@@ -464,7 +464,8 @@ fun mkFixError({is_keyword,terms,errtermvalue,
 
               val _ =
                 (if length l > 1 andalso DEBUG2 then
-                     (writeln "multiple fixes possible; could fix it by:";
+                     (printChangeList l;
+                      writeln "multiple fixes possible; could fix it by:";
                       app print_msg l;
                       writeln "chosen correction:")
                  else ();
@@ -511,8 +512,7 @@ fun mkFixError({is_keyword,terms,errtermvalue,
                        leftPos,rightPos); raise ParseError)
   end
 
-val parse = fn {arg,table,lexer,saction,void,lookahead,
-                 ec=ec as {showTerminal,...} : ('_a,'_b) ecRecord} =>
+val parse = fn {arg, table, lexer, saction, void, lookahead, ec=ec as {showTerminal, ...}} =>
   let val distance = 15   (* defer distance tokens *)
       val minAdvance = 1  (* must parse at least 1 token past error *)
       val maxAdvance = Int.max(lookahead,0)(* max distance for parse check *)
