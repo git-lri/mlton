@@ -3,7 +3,7 @@
 (* Stream: a structure implementing a lazy stream.  The signature STREAM
    is found in base.sig *)
 
-structure Stream :> STREAM =
+structure Stream : STREAM =
 struct
    open Unsynchronized
 
