@@ -9,10 +9,10 @@ functor ParserGen(structure LrTable : LR_TABLE
 
 structure LrParser :> LR_PARSER =
 struct
-val print = fn s => output(std_out,s)
-val println = fn s => (print s; print "\n")
+
 structure LrTable = LrTable
 structure Stream = Stream
+
 structure Token : TOKEN =
   struct
       structure LrTable = LrTable
@@ -24,74 +24,66 @@ structure Token : TOKEN =
 open LrTable
 open Token
 
-val DEBUG = false
+val DEBUG1 = true
 exception ParseError
+exception ParseImpossible of int
 
 type ('a,'b) elem = (state * ('a * 'b * 'b))
 type ('a,'b) stack = ('a,'b) elem list
 
-val showState = fn (STATE s) => ("STATE " ^ (makestring s))
+val showState = fn (STATE s) => "STATE " ^ Int.toString s
 
 fun printStack(stack: ('a,'b) elem list, n: int) =
    case stack
      of (state, _) :: rest =>
-           (print("          " ^ makestring n ^ ": ");
-            println(showState state);
+           (writeln ("          " ^ Int.toString n ^ ": " ^ showState state);
             printStack(rest, n+1)
            )
       | nil => ()
 
-val parse = fn {arg : 'a,
-                table : LrTable.table,
-                lexer : ('_b,'_c) token Stream.stream,
-                saction : int * '_c * ('_b,'_c) stack * 'a ->
-                          nonterm * ('_b * '_c * '_c) * ('_b,'_c) stack,
-                void : '_b,
-                ec = {is_keyword,preferred_change,
-                      errtermvalue,showTerminal,
-                      error,terms,noShift},
-                lookahead} =>
-  let fun prAction(stack as (state, _) :: _,
-                   next as (TOKEN (term,_),_), action) =
-             (println "Parse: state stack:";
+val parse = fn {arg, table, lexer, saction, void, ec = {showTerminal, error, ...}, ...} =>
+  let fun prAction(stack as (state, _) :: _, (TOKEN (term,_),_), action) =
+             (writeln "Parse: state stack:";
               printStack(stack, 0);
-              print("       state="
+              writeln( "       state="
                      ^ showState state
                      ^ " next="
                      ^ showTerminal term
                      ^ " action="
-                     );
-              case action
-                of SHIFT s => println ("SHIFT " ^ showState s)
-                 | REDUCE i => println ("REDUCE " ^ (makestring i))
-                 | ERROR => println "ERROR"
-                 | ACCEPT => println "ACCEPT";
-              action)
-        | prAction (_,_,action) = action
+                     ^ (case action
+                          of SHIFT state => "SHIFT " ^ (showState state)
+                           | REDUCE i => "REDUCE " ^ (Int.toString i)
+                           | ERROR => "ERROR"
+                           | ACCEPT => "ACCEPT")))
+        | prAction (_,_,_) = ()
 
       val action = LrTable.action table
       val goto = LrTable.goto table
 
-      fun parseStep(next as (TOKEN (terminal, value as (_,leftPos,_)),lexer) :
-                        ('_b,'_c) token * ('_b,'_c) token Stream.stream,
-                    stack as (state,_) :: _ : ('_b ,'_c) stack) =
-         case (if DEBUG then prAction(stack, next,action(state, terminal))
-               else action(state, terminal))
+      fun parseStep(lexPair as (TOKEN (terminal, value as (_,leftPos,_)),lexer),
+                    stack as (state,_) :: _) =
+          let val nextAction = action (state, terminal)
+                    val _ = if DEBUG1 then prAction(stack,lexPair,nextAction)
+                            else ()
+          in case nextAction
              of SHIFT s => parseStep(Stream.get lexer, (s,value) :: stack)
-              | REDUCE i =>
-                    let val (nonterm,value,stack as (state,_) :: _ ) =
-                                         saction(i,leftPos,stack,arg)
-                    in parseStep(next,(goto(state,nonterm),value)::stack)
-                    end
+              | REDUCE i => (case saction(i,leftPos,stack,arg)
+                             of (nonterm,value,stack as (state,_) :: _ ) =>
+                                 parseStep(lexPair,(goto(state,nonterm),value)::stack)
+                              | _ => raise (ParseImpossible 197))
               | ERROR => let val (_,leftPos,rightPos) = value
                          in error("syntax error\n",leftPos,rightPos);
                             raise ParseError
                          end
-              | ACCEPT => let val (_,(topvalue,_,_)) :: _ = stack
-                               val (token,restLexer) = next
-                          in (topvalue,Stream.cons(token,lexer))
-                          end
-      val next as (TOKEN (terminal,(_,leftPos,_)),_) = Stream.get lexer
-  in parseStep(next,[(initialState table,(void,leftPos,leftPos))])
+              | ACCEPT => case stack
+                          of (_,(topvalue,_,_)) :: _ =>
+                              let val (token,restLexer) = lexPair
+                              in (topvalue,Stream.cons(token,restLexer))
+                              end
+                           | _ => raise (ParseImpossible 202)
+          end
+        | parseStep _ = raise (ParseImpossible 204)
+      val lexPair as (TOKEN (_,(_,leftPos,_)),_) = Stream.get lexer
+  in parseStep(lexPair,[(initialState table,(void,leftPos,leftPos))])
   end
 end;
