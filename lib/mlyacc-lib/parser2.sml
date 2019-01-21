@@ -94,7 +94,7 @@ functor ParserGen(structure LrTable : LR_TABLE
                   structure Stream : STREAM) : LR_PARSER =
 *)
 
-structure LrParser : LR_PARSER =
+structure LrParser : LR_PARSER2 =
 struct
 
 structure LrTable = LrTable
