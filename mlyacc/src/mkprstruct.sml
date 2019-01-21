@@ -135,6 +135,7 @@ functor mkPrintStruct(structure LrTable : LR_TABLE
            print "\nval numrules = ";
            print (Int.toString rules);
            print "\n\
+\open Unsynchronized\n\
 \val s = ref \"\" and index = ref 0\n\
 \val string_to_int = fn () => \n\
 \let val i = !index\n\
