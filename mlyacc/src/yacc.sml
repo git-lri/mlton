@@ -771,7 +771,7 @@ precedences of the rule and the terminal are equal.
                            tokenSig = name' ^ "_TOKENS",
                            miscSig = name' ^ "_LRVALS",
                            dataStruct = "ParserData",
-                           dataSig = "PARSER_DATA"}
+                           dataSig = "PARSER_DATA2"}
 
         val (table,stateErrs,corePrint,errs) =
                  MakeTable.mkTable(grammar,defaultReductions)
