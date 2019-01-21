@@ -87,7 +87,7 @@ signature TOKEN =
 
 signature LR_PARSER =
     sig
-        structure Stream: STREAM
+        structure Stream : STREAM
         structure LrTable : LR_TABLE
         structure Token : TOKEN
 
@@ -100,11 +100,11 @@ signature LR_PARSER =
                      arg: 'arg,
                      saction : int *
                                '_c *
-                                (LrTable.state * ('_b * '_c * '_c)) list *
-                                'arg ->
-                                     LrTable.nonterm *
+                               (LrTable.state * ('_b * '_c * '_c)) list *
+                               'arg
+                               ->    LrTable.nonterm *
                                      ('_b * '_c * '_c) *
-                                     ((LrTable.state *('_b * '_c * '_c)) list),
+                                     (LrTable.state * ('_b * '_c * '_c)) list,
                      void : '_b,
                      ec : { is_keyword : LrTable.term -> bool,
                             noShift : LrTable.term -> bool,
@@ -116,8 +116,8 @@ signature LR_PARSER =
                            },
                      lookahead : int  (* max amount of lookahead used in *)
                                       (* error correction *)
-                        } -> '_b *
-                             (('_b,'_c) Token.token Stream.stream)
+                    }
+                    -> '_b * ('_b,'_c) Token.token Stream.stream
     end
 
 (* LEXER: a signature that most lexers produced for use with SML-Yacc's
@@ -139,8 +139,9 @@ signature LEXER =
                 type pos
                 type svalue
            end
-        val makeLexer : (int -> string) -> unit ->
-         (UserDeclarations.svalue,UserDeclarations.pos) UserDeclarations.token
+        val makeLexer : (int -> string)
+                        -> unit
+                        -> (UserDeclarations.svalue, UserDeclarations.pos) UserDeclarations.token
    end
 
 (* ARG_LEXER: the %arg option of ML-Lex allows users to produce lexers which
@@ -156,8 +157,10 @@ signature ARG_LEXER =
                 type svalue
                 type arg
            end
-        val makeLexer : (int -> string) -> UserDeclarations.arg -> unit ->
-         (UserDeclarations.svalue,UserDeclarations.pos) UserDeclarations.token
+        val makeLexer : (int -> string)
+                        -> UserDeclarations.arg
+                        -> unit
+                        -> (UserDeclarations.svalue,UserDeclarations.pos) UserDeclarations.token
    end
 
 (* PARSER_DATA: the signature of ParserData structures in {parser name}LrValsFun
@@ -172,21 +175,18 @@ signature ARG_LEXER =
 signature PARSER_DATA =
    sig
         (* the type of line numbers *)
-
         type pos
 
         (* the type of semantic values *)
-
         type svalue
 
-         (* the type of the user-supplied argument to the parser *)
+        (* the type of the user-supplied argument to the parser *)
         type arg
 
         (* the intended type of the result of the parser.  This value is
            produced by applying extract from the structure Actions to the
            final semantic value resultiing from a parse.
          *)
-
         type result
 
         structure LrTable : LR_TABLE
@@ -197,20 +197,16 @@ signature PARSER_DATA =
            semantic values stack in the parser.  Void is used to provide
            a default value for the semantic stack.
          *)
-
         structure Actions :
           sig
-              val actions : int * pos *
-                   (LrTable.state * (svalue * pos * pos)) list * arg->
-                         LrTable.nonterm * (svalue * pos * pos) *
-                         ((LrTable.state *(svalue * pos * pos)) list)
+              val actions : int * pos * (LrTable.state * (svalue * pos * pos)) list * arg
+                            -> LrTable.nonterm * (svalue * pos * pos) * (LrTable.state * (svalue * pos * pos)) list
               val void : svalue
               val extract : svalue -> result
           end
 
         (* structure EC contains information used to improve error
            recovery in an error-correcting parser *)
-
         structure EC :
            sig
              val is_keyword : LrTable.term -> bool
@@ -222,7 +218,6 @@ signature PARSER_DATA =
            end
 
         (* table is the LR table for the parser *)
-
         val table : LrTable.table
     end
 
@@ -237,38 +232,32 @@ signature PARSER =
         exception ParseError
 
         (* type pos is the type of line numbers *)
-
         type pos
 
         (* type result is the type of the result from the parser *)
-
         type result
 
-         (* the type of the user-supplied argument to the parser *)
+        (* the type of the user-supplied argument to the parser *)
         type arg
 
         (* type svalue is the type of semantic values for the semantic value
            stack
          *)
-
         type svalue
 
         (* val makeLexer is used to create a stream of tokens for the parser *)
-
-        val makeLexer : (int -> string) ->
-                         (svalue,pos) Token.token Stream.stream
+        val makeLexer : (int -> string)
+                        -> (svalue, pos) Token.token Stream.stream
 
         (* val parse takes a stream of tokens and a function to print
            errors and returns a value of type result and a stream containing
            the unused tokens
          *)
+        val parse : int * ((svalue, pos) Token.token Stream.stream) * (string * pos * pos -> unit) * arg
+                    -> result * (svalue, pos) Token.token Stream.stream
 
-        val parse : int * ((svalue,pos) Token.token Stream.stream) *
-                    (string * pos * pos -> unit) * arg ->
-                                result * (svalue,pos) Token.token Stream.stream
-
-        val sameToken : (svalue,pos) Token.token * (svalue,pos) Token.token ->
-                                bool
+        val sameToken : (svalue, pos) Token.token * (svalue,pos) Token.token
+                        -> bool
      end
 
 (* signature ARG_PARSER is the signature that will be matched by parsers whose
@@ -287,12 +276,10 @@ signature ARG_PARSER =
         type result
         type svalue
 
-        val makeLexer : (int -> string) -> lexarg ->
-                         (svalue,pos) Token.token Stream.stream
-        val parse : int * ((svalue,pos) Token.token Stream.stream) *
-                    (string * pos * pos -> unit) * arg ->
-                                result * (svalue,pos) Token.token Stream.stream
-
-        val sameToken : (svalue,pos) Token.token * (svalue,pos) Token.token ->
-                                bool
+        val makeLexer : (int -> string) -> lexarg
+                        -> (svalue, pos) Token.token Stream.stream
+        val parse : int * ((svalue, pos) Token.token Stream.stream) * (string * pos * pos -> unit) * arg
+                    -> result * (svalue, pos) Token.token Stream.stream
+        val sameToken : (svalue, pos) Token.token * (svalue,pos) Token.token
+                        -> bool
      end
