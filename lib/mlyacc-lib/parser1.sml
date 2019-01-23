@@ -7,11 +7,11 @@ functor ParserGen(structure LrTable : LR_TABLE
                   structure Stream : STREAM) : LR_PARSER =
 *)
 
-structure LrParser : LR_PARSER1 =
+structure LrParser1 : LR_PARSER1 =
 struct
 
 structure LrTable = LrTable
-structure Stream = Stream
+structure Stream = Stream1
 
 structure Token : TOKEN =
   struct
@@ -24,7 +24,7 @@ structure Token : TOKEN =
 open LrTable
 open Token
 
-val DEBUG1 = true
+val DEBUG1 = false
 exception ParseError
 exception ParseImpossible of int
 
@@ -41,7 +41,7 @@ fun printStack(stack: ('a,'b) elem list, n: int) =
            )
       | nil => ()
 
-val parse = fn {arg, table, lexer, saction, void, ec = {showTerminal, error, ...}, ...} =>
+val parse = fn {table, saction, void, ec = {showTerminal, error, ...}, ...} =>
   let fun prAction(stack as (state, _) :: _, (TOKEN (term,_),_), action) =
              (writeln "Parse: state stack:";
               printStack(stack, 0);
@@ -60,30 +60,35 @@ val parse = fn {arg, table, lexer, saction, void, ec = {showTerminal, error, ...
       val action = LrTable.action table
       val goto = LrTable.goto table
 
-      fun parseStep(lexPair as (TOKEN (terminal, value as (_,leftPos,_)),lexer),
-                    stack as (state,_) :: _) =
+      fun parseStep (((token as TOKEN (terminal, (f_val,leftPos,rightPos))),
+                    stack as (state,_) :: _), (lexer,arg)) =
           let val nextAction = action (state, terminal)
-                    val _ = if DEBUG1 then prAction(stack,lexPair,nextAction)
-                            else ()
+              val _ = if DEBUG1 then prAction(stack,(token, lexer),nextAction)
+                      else ()
           in case nextAction
-             of SHIFT s => parseStep(Stream.get lexer, (s,value) :: stack)
-              | REDUCE i => (case saction(i,leftPos,stack,arg)
-                             of (nonterm,value,stack as (state,_) :: _ ) =>
-                                 parseStep(lexPair,(goto(state,nonterm),value)::stack)
-                              | _ => raise (ParseImpossible 197))
-              | ERROR => let val (_,leftPos,rightPos) = value
-                         in error("syntax error\n",leftPos,rightPos);
-                            raise ParseError
-                         end
-              | ACCEPT => case stack
-                          of (_,(topvalue,_,_)) :: _ =>
-                              let val (token,restLexer) = lexPair
-                              in (topvalue,Stream.cons(token,restLexer))
-                              end
-                           | _ => raise (ParseImpossible 202)
+             of SHIFT s => (lexer, arg)
+                           |> Scan.lift f_val -- Stream.get >> (fn (value, v) => (v, (s,(value, leftPos, rightPos)) :: stack))
+                           |> parseStep
+              | REDUCE i => (lexer, arg)
+                           |> Scan.lift (fn arg =>
+                                         case saction(i,leftPos,stack,arg)
+                                         of (nonterm,(f_val, p1, p2),stack as (state,_) :: _ ) =>
+                                             arg
+                                             |> f_val >> (fn value => (token,(goto(state,nonterm),(value, p1, p2))::stack))
+                                          | _ => raise (ParseImpossible 197))
+                           |> parseStep
+              | ERROR => (error("syntax error\n",leftPos,rightPos);
+                          raise ParseError)
+              | ACCEPT => (lexer, arg)
+                          |> Stream.cons o pair token
+                          |> (case stack
+                              of (_,(topvalue,_,_)) :: _ => pair topvalue
+                               | _ => raise (ParseImpossible 202))
           end
         | parseStep _ = raise (ParseImpossible 204)
-      val lexPair as (TOKEN (_,(_,leftPos,_)),_) = Stream.get lexer
-  in parseStep(lexPair,[(initialState table,(void,leftPos,leftPos))])
+
+  in Scan.lift void -- Stream.get >> (fn (void, p1 as TOKEN (_,(_,leftPos,_))) =>
+                                      (p1,[(initialState table,(void,leftPos,leftPos))]))
+     #> parseStep
   end
 end;

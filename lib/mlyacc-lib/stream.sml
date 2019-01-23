@@ -3,7 +3,23 @@
 (* Stream: a structure implementing a lazy stream.  The signature STREAM
    is found in base.sig *)
 
-structure Stream : STREAM2 =
+structure Stream1 : STREAM1 =
+struct
+  datatype ('a, 'b) stream = Source of {buffer: 'a list, drain: 'b -> 'a * 'b}
+
+  fun streamify drain = pair (Source {buffer = [], drain = drain})
+
+  fun get (Source {buffer = [], drain}, info) =
+        let val (x, info') = drain info
+        in (x, (Source {buffer = [], drain = drain}, info')) end
+    | get (Source {buffer = x :: buffer, drain}, info) =
+            (x, (Source {buffer = buffer, drain = drain}, info))
+
+  fun cons (x, (Source {buffer, drain}, info)) =
+    (Source {buffer = x :: buffer, drain = drain}, info)
+end;
+
+structure Stream2 : STREAM2 =
 struct
    open Unsynchronized
 

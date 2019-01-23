@@ -94,11 +94,11 @@ functor ParserGen(structure LrTable : LR_TABLE
                   structure Stream : STREAM) : LR_PARSER =
 *)
 
-structure LrParser : LR_PARSER2 =
+structure LrParser2 : LR_PARSER2 =
 struct
 
 structure LrTable = LrTable
-structure Stream = Stream
+structure Stream = Stream2
 
 fun eqT (LrTable.T i, LrTable.T i') = i = i'
 

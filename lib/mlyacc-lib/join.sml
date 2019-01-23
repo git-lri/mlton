@@ -7,47 +7,8 @@
    of tokens.
 *)
 
-functor Join1 (structure Lex : LEXER
-               structure ParserData: PARSER_DATA
-               structure LrParser : LR_PARSER1
-               sharing ParserData.LrTable = LrParser.LrTable
-               sharing ParserData.Token = LrParser.Token
-               sharing type Lex.UserDeclarations.svalue = ParserData.svalue
-               sharing type Lex.UserDeclarations.pos = ParserData.pos
-               sharing type Lex.UserDeclarations.token = ParserData.Token.token)
-                 : PARSER1 =
-struct
-    structure Token = ParserData.Token
-    structure Stream = LrParser.Stream
-
-    exception ParseError = LrParser.ParseError
-
-    type arg = ParserData.arg
-    type pos = ParserData.pos
-    type result = ParserData.result
-    type svalue = ParserData.svalue
-    val makeLexer = LrParser.Stream.streamify o Lex.makeLexer
-    val parse = fn (lookahead,lexer,error,arg) =>
-        (fn (a,b) => (ParserData.Actions.extract a,b))
-     (LrParser.parse {table = ParserData.table,
-                lexer=lexer,
-                lookahead=lookahead,
-                saction = ParserData.Actions.actions,
-                arg=arg,
-                void= ParserData.Actions.void,
-                ec = {is_keyword = ParserData.EC.is_keyword,
-                      noShift = ParserData.EC.noShift,
-                      preferred_change = ParserData.EC.preferred_change,
-                      errtermvalue = ParserData.EC.errtermvalue,
-                      error=error,
-                      showTerminal = ParserData.EC.showTerminal,
-                      terms = ParserData.EC.terms}}
-      )
-     val sameToken = Token.sameToken
-end
-
 functor Join2 (structure Lex : LEXER
-               structure ParserData: PARSER_DATA
+               structure ParserData: PARSER_DATA2
                structure LrParser : LR_PARSER2
                sharing ParserData.LrTable = LrParser.LrTable
                sharing ParserData.Token = LrParser.Token
@@ -90,12 +51,13 @@ end
    yielding a value of type unit -> (svalue,pos) token
  *)
 
-functor JoinWithArg1(structure Lex : ARG_LEXER
-             structure ParserData: PARSER_DATA
+functor JoinWithArg1(structure Lex : ARG_LEXER1
+             structure ParserData: PARSER_DATA1
              structure LrParser : LR_PARSER1
              sharing ParserData.LrTable = LrParser.LrTable
              sharing ParserData.Token = LrParser.Token
-             sharing type Lex.UserDeclarations.svalue = ParserData.svalue
+             sharing type Lex.UserDeclarations.arg = ParserData.arg
+             sharing type Lex.UserDeclarations.svalue0 = ParserData.svalue0
              sharing type Lex.UserDeclarations.pos = ParserData.pos
              sharing type Lex.UserDeclarations.token = ParserData.Token.token)
                  : ARG_PARSER1  =
@@ -106,37 +68,36 @@ struct
     exception ParseError = LrParser.ParseError
 
     type arg = ParserData.arg
-    type lexarg = Lex.UserDeclarations.arg
     type pos = ParserData.pos
     type result = ParserData.result
-    type svalue = ParserData.svalue
+    type svalue0 = ParserData.svalue0
+    type svalue = arg -> svalue0 * arg
 
-    val makeLexer = fn s => fn arg =>
-                 LrParser.Stream.streamify (Lex.makeLexer s arg)
-    val parse = fn (lookahead,lexer,error,arg) =>
-        (fn (a,b) => (ParserData.Actions.extract a,b))
-     (LrParser.parse {table = ParserData.table,
-                lexer=lexer,
-                lookahead=lookahead,
-                saction = ParserData.Actions.actions,
-                arg=arg,
-                void= ParserData.Actions.void,
-                ec = {is_keyword = ParserData.EC.is_keyword,
-                      noShift = ParserData.EC.noShift,
-                      preferred_change = ParserData.EC.preferred_change,
-                      errtermvalue = ParserData.EC.errtermvalue,
-                      error=error,
-                      showTerminal = ParserData.EC.showTerminal,
-                      terms = ParserData.EC.terms}}
-      )
+    val makeLexer = LrParser.Stream.streamify o Lex.makeLexer
+
+    val parse = fn (lookahead,error) =>
+      LrParser.parse {table = ParserData.table,
+                      lookahead=lookahead,
+                      saction = ParserData.Actions.actions,
+                      void= ParserData.Actions.void,
+                      ec = {is_keyword = ParserData.EC.is_keyword,
+                            noShift = ParserData.EC.noShift,
+                            preferred_change = ParserData.EC.preferred_change,
+                            errtermvalue = ParserData.EC.errtermvalue,
+                            error=error,
+                            showTerminal = ParserData.EC.showTerminal,
+                            terms = ParserData.EC.terms}}
+      #>> ParserData.Actions.extract
+
     val sameToken = Token.sameToken
 end
 
-functor JoinWithArg2(structure Lex : ARG_LEXER
-             structure ParserData: PARSER_DATA
+functor JoinWithArg2(structure Lex : ARG_LEXER2
+             structure ParserData: PARSER_DATA2
              structure LrParser : LR_PARSER2
              sharing ParserData.LrTable = LrParser.LrTable
              sharing ParserData.Token = LrParser.Token
+             sharing type Lex.UserDeclarations.arg = ParserData.arg
              sharing type Lex.UserDeclarations.svalue = ParserData.svalue
              sharing type Lex.UserDeclarations.pos = ParserData.pos
              sharing type Lex.UserDeclarations.token = ParserData.Token.token)
@@ -148,13 +109,11 @@ struct
     exception ParseError = LrParser.ParseError
 
     type arg = ParserData.arg
-    type lexarg = Lex.UserDeclarations.arg
     type pos = ParserData.pos
     type result = ParserData.result
     type svalue = ParserData.svalue
 
-    val makeLexer = fn s => fn arg =>
-                 LrParser.Stream.streamify (Lex.makeLexer s arg)
+    val makeLexer = LrParser.Stream.streamify oo Lex.makeLexer
     val parse = fn (lookahead,lexer,error,arg) =>
         (fn (a,b) => (ParserData.Actions.extract a,b))
      (LrParser.parse {table = ParserData.table,

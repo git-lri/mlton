@@ -125,12 +125,18 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
         sayln ("type arg = " ^ arg_type);
         sayln ("structure " ^ valueStruct ^ " = ");
         sayln "struct";
-        say ("datatype svalue = " ^ termvoid ^ " | " ^ ntvoid ^ " of" ^
-             (if pureActions then "" else " unit -> ") ^ " unit");
+        say (if pureActions then
+               "datatype svalue0 = " ^ termvoid ^ " | " ^ ntvoid ^ " of unit"
+             else
+               "datatype svalue = " ^ termvoid ^ " | " ^ ntvoid ^ " of unit -> unit");
         app prConstr term;
         app prConstr nonterm;
         sayln "\nend";
-        sayln ("type svalue = " ^ valueStruct ^ ".svalue");
+        (if pureActions then
+           (sayln ("type svalue0 = " ^ valueStruct ^ ".svalue0");
+            sayln "type svalue = arg -> svalue0 * arg")
+         else
+           sayln ("type svalue = " ^ valueStruct ^ ".svalue"));
         say "type result = ";
         case symbolType (NONTERM start)
         of NONE => sayln "unit"
@@ -150,7 +156,12 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
                  (case tokenInfo of
                       NONE => ()
                     | _ => sayln ("open "^dataStruct^".Header"));
-                 sayln ("type svalue = " ^ dataStruct ^ ".svalue");
+                 (if pureActions then
+                   (sayln ("type arg = " ^ dataStruct ^ ".arg");
+                    sayln ("type svalue0 = " ^ dataStruct ^ ".svalue0");
+                    sayln "type svalue = arg -> svalue0 * arg")
+                  else
+                    sayln ("type svalue = " ^ dataStruct ^ ".svalue"));
                  sayln "type ('a,'b) token = ('a,'b) Token.token";
                  let val f = fn term as T i =>
                         (say "fun "; say (termToString term);
@@ -160,12 +171,15 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
                          say (dataStruct ^ "." ^ tableStruct ^ ".T ");
                          say (Int.toString i);
                          say ",(";
-                         say (dataStruct ^ "." ^ valueStruct ^ ".");
-                         if (hasType (TERM term)) then
-                            (say (termToString term);
-                             if pureActions then say " i"
-                             else say " (fn () => i)")
-                         else say termvoid;
+                         let val s = 
+                           dataStruct ^ "." ^ valueStruct ^ "."
+                           ^ (if (hasType (TERM term)) then
+                              (termToString term ^
+                               (if pureActions then " i"
+                                else " (fn () => i)"))
+                           else termvoid)
+                         in say (if pureActions then "pair (" ^ s ^ ")" else s)
+                         end;
                          say ",";
                          sayln "p1,p2))")
                 in app f terms
@@ -175,25 +189,30 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
     (* function to print signatures out - takes print function which
         does not need to insert line breaks *)
 
-    val printSigs = fn (VALS {term,tokenInfo,...},
+    val printSigs = fn (VALS {term,tokenInfo,pureActions,...},
                         NAMES {tokenSig,tokenStruct,miscSig,
                                 dataStruct, dataSig, ...},
                         say) =>
           say  ("signature " ^ tokenSig ^ " =\nsig\n"^
                 (case tokenInfo of NONE => "" | SOME s => (s^"\n"))^
-                 "type ('a,'b) token\ntype svalue\n" ^
-                 (List.foldr (fn ((s,ty),r) => String.concat [
+                "type ('a,'b) token\n"^
+                (if pureActions then
+                   "type arg\ntype svalue0\ntype svalue = arg -> svalue0 * arg\n"
+                 else "type svalue\n") ^
+                (List.foldr (fn ((s,ty),r) => String.concat [
                     "val ", symbolName s,
                     (case ty
                      of NONE => ": "
                       | SOME l => ": (" ^ (tyName l) ^ ") * "),
                     " 'a * 'a -> (svalue,'a) token\n", r]) "" term) ^
-                 "end\nsignature " ^ miscSig ^
-                  "=\nsig\nstructure Tokens : " ^ tokenSig ^
-                  "\nstructure " ^ dataStruct ^ ":" ^ dataSig ^
-                  "\nsharing type " ^ dataStruct ^
-                  ".Token.token = Tokens.token\nsharing type " ^
-                  dataStruct ^ ".svalue = Tokens.svalue\nend\n")
+                "end\nsignature " ^ miscSig ^
+                "=\nsig\nstructure Tokens : " ^ tokenSig ^
+                "\nstructure " ^ dataStruct ^ ":" ^ dataSig ^
+                "\nsharing type " ^ dataStruct ^
+                ".Token.token = Tokens.token\n"^
+                (if pureActions then ""
+                 else "sharing type " ^ dataStruct ^ ".svalue = Tokens.svalue\n") ^
+                "end\n")
 
     (* function to print structure for error correction *)
 
@@ -229,7 +248,7 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
          val printErrValues = fn (l : (term * string) list) =>
             (sayln "local open Header in";
              sayln "val errtermvalue=";
-             say "fn ";
+             say ((if pureActions then "pair o" else "") ^ " (fn ");
              app (fn (t,s) =>
                     (sayterm t; say " => ";
                      saydot valueStruct; say (termToString t);
@@ -241,7 +260,7 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
                  ) l;
             say "_ => ";
             say (valueStruct ^ ".");
-            sayln termvoid; sayln "end")
+            sayln termvoid; sayln ") end")
 
 
           val printNames = fn () =>
@@ -343,7 +362,7 @@ let val printAbsynRule = Absyn.printRule(say,sayln,fmtPos)
         (* construct case body *)
 
            val defaultPos = EVAR "defaultPos"
-           val resultexp = EVAR "result"
+           val resultexp = if pureActions then EAPP (EVAR "pair", EVAR "result") else EVAR "result"
            val resultpat = PVAR "result"
            val code = CODE code
            val rest = EVAR "rest671"
@@ -404,7 +423,7 @@ let val printAbsynRule = Absyn.printRule(say,sayln,fmtPos)
            sayln "val actions = ";
            prRules();
            sayln "end";
-           say "val void = ";
+           say ("val void = " ^ (if pureActions then "pair " else ""));
            saydot valueStruct;
            sayln termvoid;
            say "val extract = ";
@@ -771,7 +790,7 @@ precedences of the rule and the terminal are equal.
                            tokenSig = name' ^ "_TOKENS",
                            miscSig = name' ^ "_LRVALS",
                            dataStruct = "ParserData",
-                           dataSig = "PARSER_DATA2"}
+                           dataSig = if pureActions then "PARSER_DATA1" else "PARSER_DATA2"}
 
         val (table,stateErrs,corePrint,errs) =
                  MakeTable.mkTable(grammar,defaultReductions)

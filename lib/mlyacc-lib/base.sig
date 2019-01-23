@@ -6,15 +6,19 @@
 
 (* STREAM: signature for a lazy stream.*)
 
-signature STREAM0 =
+signature STREAM1 =
+ sig type ('xa, 'xb) stream
+     val streamify : ('_b -> '_a * '_b) -> '_b -> ('_a, '_b) stream * '_b
+     val cons : '_a * (('_a, '_b) stream * '_b) -> ('_a, '_b) stream * '_b
+     val get : ('_a, '_b) stream * '_b -> '_a * (('_a, '_b) stream * '_b)
+ end
+
+signature STREAM2 =
  sig type 'xa stream
      val streamify : (unit -> '_a) -> '_a stream
      val cons : '_a * '_a stream -> '_a stream
      val get : '_a stream -> '_a * '_a stream
  end
-
-signature STREAM1 = STREAM0
-signature STREAM2 = STREAM0
 
 (* LR_TABLE: signature for an LR Table.
 
@@ -99,20 +103,18 @@ signature LR_PARSER1 =
         exception ParseError
 
         val parse : {table : LrTable.table,
-                     lexer : ('_b,'_c) Token.token Stream.stream,
-                     arg: 'arg,
                      saction : int *
                                '_c *
                                (LrTable.state * ('_b * '_c * '_c)) list *
                                'arg
                                ->    LrTable.nonterm *
-                                     ('_b * '_c * '_c) *
+                                     (('arg -> '_b * 'arg) * '_c * '_c) *
                                      (LrTable.state * ('_b * '_c * '_c)) list,
-                     void : '_b,
+                     void : 'arg -> '_b * 'arg,
                      ec : { is_keyword : LrTable.term -> bool,
                             noShift : LrTable.term -> bool,
                             preferred_change : (LrTable.term list * LrTable.term list) list,
-                            errtermvalue : LrTable.term -> '_b,
+                            errtermvalue : LrTable.term -> 'arg -> '_b * 'arg,
                             showTerminal : LrTable.term -> string,
                             terms: LrTable.term list,
                             error : string * '_c * '_c -> unit
@@ -120,7 +122,8 @@ signature LR_PARSER1 =
                      lookahead : int  (* max amount of lookahead used in *)
                                       (* error correction *)
                     }
-                    -> '_b * ('_b,'_c) Token.token Stream.stream
+                    -> ((('arg -> '_b * 'arg,'_c) Token.token, 'arg) Stream.stream * 'arg)
+                    -> '_b * ((('arg -> '_b * 'arg,'_c) Token.token, 'arg) Stream.stream * 'arg)
     end
 
 signature LR_PARSER2 =
@@ -186,14 +189,29 @@ signature LEXER =
    also take an argument before yielding a function from unit to a token
 *)
 
-signature ARG_LEXER =
+signature ARG_LEXER1 =
    sig
        structure UserDeclarations :
            sig
                 type ('a,'b) token
                 type pos
-                type svalue
                 type arg
+                type svalue0
+                type svalue = arg -> svalue0 * arg
+           end
+        val makeLexer : (int -> string)
+                        -> UserDeclarations.arg
+                        -> (UserDeclarations.svalue,UserDeclarations.pos) UserDeclarations.token * UserDeclarations.arg
+   end
+
+signature ARG_LEXER2 =
+   sig
+       structure UserDeclarations :
+           sig
+                type ('a,'b) token
+                type pos
+                type arg
+                type svalue
            end
         val makeLexer : (int -> string)
                         -> UserDeclarations.arg
@@ -210,16 +228,66 @@ signature ARG_LEXER =
 
 *)
 
-signature PARSER_DATA =
+signature PARSER_DATA1 =
    sig
         (* the type of line numbers *)
         type pos
 
+        (* the type of the user-supplied argument to the parser *)
+        type arg
+
         (* the type of semantic values *)
-        type svalue
+        type svalue0
+        type svalue = arg -> svalue0 * arg
+
+        (* the intended type of the result of the parser.  This value is
+           produced by applying extract from the structure Actions to the
+           final semantic value resultiing from a parse.
+         *)
+        type result
+
+        structure LrTable : LR_TABLE
+        structure Token : TOKEN
+        sharing Token.LrTable = LrTable
+
+        (* structure Actions contains the functions which mantain the
+           semantic values stack in the parser.  Void is used to provide
+           a default value for the semantic stack.
+         *)
+        structure Actions :
+          sig
+              val actions : int * pos * (LrTable.state * (svalue0 * pos * pos)) list * arg
+                            -> LrTable.nonterm * (svalue * pos * pos) * (LrTable.state * (svalue0 * pos * pos)) list
+              val void : svalue
+              val extract : svalue0 -> result
+          end
+
+        (* structure EC contains information used to improve error
+           recovery in an error-correcting parser *)
+        structure EC :
+           sig
+             val is_keyword : LrTable.term -> bool
+             val noShift : LrTable.term -> bool
+             val preferred_change : (LrTable.term list * LrTable.term list) list
+             val errtermvalue : LrTable.term -> svalue
+             val showTerminal : LrTable.term -> string
+             val terms: LrTable.term list
+           end
+
+        (* table is the LR table for the parser *)
+        val table : LrTable.table
+    end
+
+signature PARSER_DATA2 =
+   sig
+        (* the type of line numbers *)
+        type pos
 
         (* the type of the user-supplied argument to the parser *)
         type arg
+
+        (* the type of semantic values *)
+        type svalue
 
         (* the intended type of the result of the parser.  This value is
            produced by applying extract from the structure Actions to the
@@ -262,41 +330,6 @@ signature PARSER_DATA =
 (* signature PARSER is the signature that most user parsers created by
    SML-Yacc will match.
 *)
-
-signature PARSER1 =
-    sig
-        structure Token : TOKEN
-        structure Stream : STREAM1
-        exception ParseError
-
-        (* type pos is the type of line numbers *)
-        type pos
-
-        (* type result is the type of the result from the parser *)
-        type result
-
-        (* the type of the user-supplied argument to the parser *)
-        type arg
-
-        (* type svalue is the type of semantic values for the semantic value
-           stack
-         *)
-        type svalue
-
-        (* val makeLexer is used to create a stream of tokens for the parser *)
-        val makeLexer : (int -> string)
-                        -> (svalue, pos) Token.token Stream.stream
-
-        (* val parse takes a stream of tokens and a function to print
-           errors and returns a value of type result and a stream containing
-           the unused tokens
-         *)
-        val parse : int * ((svalue, pos) Token.token Stream.stream) * (string * pos * pos -> unit) * arg
-                    -> result * (svalue, pos) Token.token Stream.stream
-
-        val sameToken : (svalue, pos) Token.token * (svalue,pos) Token.token
-                        -> bool
-     end
 
 signature PARSER2 =
     sig
@@ -344,15 +377,16 @@ signature ARG_PARSER1 =
         exception ParseError
 
         type arg
-        type lexarg
         type pos
         type result
-        type svalue
+        type svalue0
+        type svalue = arg -> svalue0 * arg
 
-        val makeLexer : (int -> string) -> lexarg
-                        -> (svalue, pos) Token.token Stream.stream
-        val parse : int * ((svalue, pos) Token.token Stream.stream) * (string * pos * pos -> unit) * arg
-                    -> result * (svalue, pos) Token.token Stream.stream
+        val makeLexer : (int -> string) -> arg
+                        -> ((svalue, pos) Token.token, arg) Stream.stream * arg
+        val parse : int * (string * pos * pos -> unit) 
+                    -> ((((svalue, pos) Token.token, arg) Stream.stream) * arg)
+                    -> result * (((svalue, pos) Token.token, arg) Stream.stream * arg)
         val sameToken : (svalue, pos) Token.token * (svalue,pos) Token.token
                         -> bool
      end
@@ -364,12 +398,11 @@ signature ARG_PARSER2 =
         exception ParseError
 
         type arg
-        type lexarg
         type pos
         type result
         type svalue
 
-        val makeLexer : (int -> string) -> lexarg
+        val makeLexer : (int -> string) -> arg
                         -> (svalue, pos) Token.token Stream.stream
         val parse : int * ((svalue, pos) Token.token Stream.stream) * (string * pos * pos -> unit) * arg
                     -> result * (svalue, pos) Token.token Stream.stream
