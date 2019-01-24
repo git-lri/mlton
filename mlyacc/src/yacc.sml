@@ -153,9 +153,9 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
                 tokenStruct,tokenSig,dataStruct,...}) =>
                 (sayln ("structure " ^ tokenStruct ^ " : " ^ tokenSig ^ " =");
                  sayln "struct";
-                 (case tokenInfo of
-                      NONE => ()
-                    | _ => sayln ("open "^dataStruct^".Header"));
+                 (if tokenInfo = NONE andalso not pureActions
+                  then ()
+                  else sayln ("open "^dataStruct^".Header"));
                  (if pureActions then
                    (sayln ("type arg = " ^ dataStruct ^ ".arg");
                     sayln ("type svalue0 = " ^ dataStruct ^ ".svalue0");
@@ -178,7 +178,7 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
                                (if pureActions then " i"
                                 else " (fn () => i)"))
                            else termvoid)
-                         in say (if pureActions then "pair (" ^ s ^ ")" else s)
+                         in say (if pureActions then "return (" ^ s ^ ")" else s)
                          end;
                          say ",";
                          sayln "p1,p2))")
@@ -248,7 +248,7 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
          val printErrValues = fn (l : (term * string) list) =>
             (sayln "local open Header in";
              sayln "val errtermvalue=";
-             say ((if pureActions then "pair o" else "") ^ " (fn ");
+             say ((if pureActions then "return o" else "") ^ " (fn ");
              app (fn (t,s) =>
                     (sayterm t; say " => ";
                      saydot valueStruct; say (termToString t);
@@ -319,7 +319,7 @@ let val printAbsynRule = Absyn.printRule(say,sayln,fmtPos)
     val saySym = symbolToString
 
     val printCase = fn (i:int, r as {lhs=lhs as (NT lhsNum),prec,
-                                        rhs,code,rulenum}) =>
+                                        rhs,code=code0,rulenum}) =>
 
        (* mkToken: Build an argument *)
 
@@ -362,17 +362,22 @@ let val printAbsynRule = Absyn.printRule(say,sayln,fmtPos)
         (* construct case body *)
 
            val defaultPos = EVAR "defaultPos"
-           val resultexp = if pureActions then EAPP (EVAR "pair", EVAR "result") else EVAR "result"
+           val explicit_monad = case explode (#text code0) of #"(" :: #"*" :: #"%" :: #"*" :: #")" :: _ => true | _ => false
+           val resultexp = if pureActions andalso not explicit_monad then EAPP (EVAR "return", EVAR "result") else EVAR "result"
            val resultpat = PVAR "result"
-           val code = CODE code
+           val code = CODE code0
            val rest = EVAR "rest671"
+           val cons_name = EVAR(valueStruct^"."^
+                                 (if hasType (NONTERM lhs)
+                                      then saySym(NONTERM lhs)
+                                      else ntvoid))
 
            val body =
              LET([VB(resultpat,
-                     EAPP(EVAR(valueStruct^"."^
-                             (if hasType (NONTERM lhs)
-                                  then saySym(NONTERM lhs)
-                                  else ntvoid)),
+                   if pureActions andalso explicit_monad
+                     then EAPP (EVAR "op #>>", ETUPLE [code, cons_name])
+                     else
+                       EAPP(cons_name,
                           if pureActions then code
                           else if argsWithTypes=nil then FN(WILD,code)
                           else
@@ -422,10 +427,10 @@ let val printAbsynRule = Absyn.printRule(say,sayln,fmtPos)
            sayln "local open Header in";
            sayln "val actions = ";
            prRules();
-           sayln "end";
-           say ("val void = " ^ (if pureActions then "pair " else ""));
+           say ("val void = " ^ (if pureActions then "return " else ""));
            saydot valueStruct;
            sayln termvoid;
+           sayln "end";
            say "val extract = ";
            say "fn a => (fn ";
            saydot valueStruct;
