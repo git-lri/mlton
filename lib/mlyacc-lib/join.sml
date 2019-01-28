@@ -72,6 +72,7 @@ struct
     type result = ParserData.result
     type svalue0 = ParserData.svalue0
     type svalue = arg -> svalue0 * arg
+    type token0 = Lex.UserDeclarations.token0
 
     val makeLexer = LrParser.Stream.streamify o Lex.makeLexer
 

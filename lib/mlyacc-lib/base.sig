@@ -193,13 +193,14 @@ signature ARG_LEXER1 =
    sig
        structure UserDeclarations :
            sig
+                type token0
                 type ('a,'b) token
                 type pos
                 type arg
                 type svalue0
                 type svalue = arg -> svalue0 * arg
            end
-        val makeLexer : (int -> string)
+        val makeLexer : (int -> UserDeclarations.token0 Antiquote.antiquote list)
                         -> UserDeclarations.arg
                         -> (UserDeclarations.svalue,UserDeclarations.pos) UserDeclarations.token * UserDeclarations.arg
    end
@@ -381,8 +382,9 @@ signature ARG_PARSER1 =
         type result
         type svalue0
         type svalue = arg -> svalue0 * arg
+        type token0
 
-        val makeLexer : (int -> string) -> arg
+        val makeLexer : (int -> token0 Antiquote.antiquote list) -> arg
                         -> ((svalue, pos) Token.token, arg) Stream.stream * arg
         val parse : int * (string * pos * pos -> unit) 
                     -> ((((svalue, pos) Token.token, arg) Stream.stream) * arg)
