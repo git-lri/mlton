@@ -155,7 +155,7 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
                  sayln "struct";
                  (if tokenInfo = NONE andalso not pureActions
                   then ()
-                  else sayln ("open "^dataStruct^".Header"));
+                  else sayln ("open Header"));
                  (if pureActions then
                    (sayln ("type arg = " ^ dataStruct ^ ".arg");
                     sayln ("type svalue0 = " ^ dataStruct ^ ".svalue0");
@@ -854,14 +854,14 @@ precedences of the rule and the terminal are equal.
              | SOME s => say s;
             sayln " = ";
             sayln "struct";
-            sayln ("structure " ^ dataStruct ^ "=");
-            sayln "struct";
             sayln "structure Header = ";
             sayln "struct";
             say (fmtPos (SOME {line = 1, col = 1}));
             sayln header;
             say (fmtPos NONE);
             sayln "end";
+            sayln ("structure " ^ dataStruct ^ "=");
+            sayln "struct";
             sayln "structure LrTable = Token.LrTable";
             sayln "structure Token = Token";
             sayln "local open LrTable in ";
