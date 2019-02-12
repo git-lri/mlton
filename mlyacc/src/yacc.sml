@@ -109,12 +109,13 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
         with the scope of constructors.
     *)
 
-    val printTypes1 = fn (VALS {say,sayln,term,nonterm,symbolToString,pos_type,
+    val printTypes1 = fn (VALS {term,nonterm,symbolToString,pos_type,
                                  arg_type,
                                  termvoid,ntvoid,saydot,hasType,start,
                                  pureActions,...},
-                           NAMES {valueStruct,...},symbolType) =>
-     let val prConstr = fn (symbol,SOME s) =>
+                           NAMES {valueStruct,...}, say) =>
+     let val sayln = fn t => (say t; say "\n")
+         val prConstr = fn (symbol,SOME s) =>
                            say (" | " ^ (symbolName symbol) ^ " of " ^
                                   (if pureActions then "" else "unit -> ") ^
                                 " (" ^ tyName s ^ ")"
@@ -195,10 +196,11 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
     (* function to print signatures out - takes print function which
         does not need to insert line breaks *)
 
-    val printSigs = fn (VALS {term,tokenInfo,pureActions,...},
-                        NAMES {tokenSig,tokenStruct,miscSig,
-                                dataStruct, dataSig, ...},
+    val printSigs = fn (values as VALS {term,tokenInfo,pureActions,...},
+                        names as NAMES {tokenSig,tokenStruct,miscSig,
+                                        dataStruct, dataSig, ...},
                         say) =>
+      let in printTypes1(values,names, say);
           say  ("signature " ^ tokenSig ^ " =\nsig\n"^
                 (case tokenInfo of NONE => "" | SOME s => (s^"\n"))^
                 "type ('a,'b) token\n"^
@@ -219,6 +221,7 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
                 (if pureActions then ""
                  else "sharing type " ^ dataStruct ^ ".svalue = Tokens.svalue\n") ^
                 "end\n")
+      end
 
     (* function to print structure for error correction *)
 
@@ -866,7 +869,6 @@ precedences of the rule and the terminal are equal.
             sayln header;
             say (fmtPos NONE);
             sayln "end";
-            printTypes1(values,names,symbolType);
             sayln ("structure " ^ dataStruct ^ "=");
             sayln "struct";
             sayln "structure LrTable = Token.LrTable";
