@@ -109,7 +109,7 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
         with the scope of constructors.
     *)
 
-    val printTypes = fn (VALS {say,sayln,term,nonterm,symbolToString,pos_type,
+    val printTypes1 = fn (VALS {say,sayln,term,nonterm,symbolToString,pos_type,
                                  arg_type,
                                  termvoid,ntvoid,saydot,hasType,start,
                                  pureActions,...},
@@ -120,10 +120,7 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
                                 " (" ^ tyName s ^ ")"
                                 )
                          | _ => ()
-     in sayln "local open Header in";
-        sayln ("type pos = " ^ pos_type);
-        sayln ("type arg = " ^ arg_type);
-        sayln ("structure " ^ valueStruct ^ " = ");
+     in sayln ("structure " ^ valueStruct ^ " = ");
         sayln "struct";
         say (if pureActions then
                "datatype svalue0 = " ^ termvoid ^ " | " ^ ntvoid ^ " of unit"
@@ -131,7 +128,17 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
                "datatype svalue = " ^ termvoid ^ " | " ^ ntvoid ^ " of unit -> unit");
         app prConstr term;
         app prConstr nonterm;
-        sayln "\nend";
+        sayln "\nend"
+    end
+
+    val printTypes2 = fn (VALS {say,sayln,term,nonterm,symbolToString,pos_type,
+                                 arg_type,
+                                 termvoid,ntvoid,saydot,hasType,start,
+                                 pureActions,...},
+                           NAMES {valueStruct,...},symbolType) =>
+       (sayln "local open Header in";
+        sayln ("type pos = " ^ pos_type);
+        sayln ("type arg = " ^ arg_type);
         (if pureActions then
            (sayln ("type svalue0 = " ^ valueStruct ^ ".svalue0");
             sayln "type svalue = arg -> svalue0 * arg")
@@ -141,8 +148,7 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
         case symbolType (NONTERM start)
         of NONE => sayln "unit"
          | SOME t => (say (tyName t); sayln "");
-        sayln "end"
-    end
+        sayln "end")
 
      (* function to print Tokens{n} structure *)
 
@@ -172,7 +178,7 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
                          say (Int.toString i);
                          say ",(";
                          let val s = 
-                           dataStruct ^ "." ^ valueStruct ^ "."
+                           valueStruct ^ "."
                            ^ (if (hasType (TERM term)) then
                               (termToString term ^
                                (if pureActions then " i"
@@ -860,6 +866,7 @@ precedences of the rule and the terminal are equal.
             sayln header;
             say (fmtPos NONE);
             sayln "end";
+            printTypes1(values,names,symbolType);
             sayln ("structure " ^ dataStruct ^ "=");
             sayln "struct";
             sayln "structure LrTable = Token.LrTable";
@@ -869,7 +876,7 @@ precedences of the rule and the terminal are equal.
                                               name = "table",
                                               verbose=verbose};
             sayln "end";
-            printTypes(values,names,symbolType);
+            printTypes2(values,names,symbolType);
             printEC (keyword,change,noshift,value,values,names);
             printAction(rules,values,names);
             sayln "end";
