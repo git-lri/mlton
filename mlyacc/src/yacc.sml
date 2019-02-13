@@ -109,18 +109,37 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
         with the scope of constructors.
     *)
 
-    val printTypes1 = fn (VALS {term,nonterm,symbolToString,pos_type,
-                                 arg_type,
-                                 termvoid,ntvoid,saydot,hasType,start,
-                                 pureActions,...},
-                           NAMES {valueStruct,...}, say) =>
+    val printTypes1 = fn (rules,
+                          VALS {term,nonterm,symbolToString,pos_type,
+                                arg_type,
+                                termvoid,ntvoid,saydot,hasType,start,
+                                pureActions,...},
+                          NAMES {valueStruct,...},
+                          say) =>
      let val sayln = fn t => (say t; say "\n")
+
+         val addConstr = fn (symbol,SOME s) =>
+           Symtab.insert (op =) ((symbolName symbol), (if pureActions then "" else "unit -> ") ^
+                                " (" ^ tyName s ^ ")")
+                         | _ => I
+         val tytab = fold (fold addConstr) [term, nonterm] Symtab.empty
+         val saySym = symbolToString
+
          val prConstr = fn (symbol,SOME s) =>
                            say (" | " ^ (symbolName symbol) ^ " of " ^
                                   (if pureActions then "" else "unit -> ") ^
                                 " (" ^ tyName s ^ ")"
                                 )
                          | _ => ()
+         fun prDestr0 f {lhs, rulenum, ...} =
+           sayln (f (Int.toString rulenum) (if hasType (NONTERM lhs)
+                                            then saySym(NONTERM lhs)
+                                            else ntvoid))
+         val prDestrTy = prDestr0 (fn rulen => fn constr =>
+                                     "  " ^ rulen ^ " => \"" ^ (Symtab.lookup tytab constr |> the) ^ "\" |")
+         val prDestr = prDestr0 (fn rulen => fn constr =>
+                                   "val reduce" ^ rulen ^ " = fn " ^ 
+                                     constr ^ " x => x | _ => error \"Only expecting " ^ constr ^ "\"")
      in sayln ("structure " ^ valueStruct ^ " = ");
         sayln "struct";
         say (if pureActions then
@@ -129,7 +148,12 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
                "datatype svalue = " ^ termvoid ^ " | " ^ ntvoid ^ " of unit -> unit");
         app prConstr term;
         app prConstr nonterm;
-        sayln "\nend"
+        sayln "";
+        (sayln "val type_reduce = fn";
+         app prDestrTy rules;
+         sayln "  _ => error \"reduce type not found\"");
+        app prDestr rules;
+        sayln "end"
     end
 
     val printTypes2 = fn (VALS {say,sayln,term,nonterm,symbolToString,pos_type,
@@ -196,11 +220,12 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
     (* function to print signatures out - takes print function which
         does not need to insert line breaks *)
 
-    val printSigs = fn (values as VALS {term,tokenInfo,pureActions,...},
+    val printSigs = fn (rules,
+                        values as VALS {term,tokenInfo,pureActions,...},
                         names as NAMES {tokenSig,tokenStruct,miscSig,
                                         dataStruct, dataSig, ...},
                         say) =>
-      let in printTypes1(values,names, say);
+      let in printTypes1 (rules, values, names, say);
           say  ("signature " ^ tokenSig ^ " =\nsig\n"^
                 (case tokenInfo of NONE => "" | SOME s => (s^"\n"))^
                 "type ('a,'b) token\n"^
@@ -884,7 +909,7 @@ precedences of the rule and the terminal are equal.
             sayln "end";
             printTokenStruct(values,names);
             sayln "end";
-            printSigs(values,names,fn s => TextIO.output(sigs,s));
+            printSigs(rules,values,names,fn s => TextIO.output(sigs,s));
             TextIO.closeOut sigs;
             TextIO.closeOut result;
             MakeTable.Errs.printSummary (fn s => TextIO.output(TextIO.stdOut,s)) errs
