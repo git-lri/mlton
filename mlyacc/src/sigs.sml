@@ -51,7 +51,7 @@ signature HEADER =
      val join_decls : declData * declData * inputSource * pos -> declData
 
      type parseResult
-     val getResult : parseResult -> string * declData * rule list
+     val getResult : parseResult -> string * declData * rule list list
   end;
 
 signature PARSE_GEN_PARSER =
@@ -82,7 +82,7 @@ signature GRAMMAR =
 
         datatype grammar = GRAMMAR of
                         {rules: {lhs : nonterm, rhs : symbol list,
-                                 precedence : int option, rulenum : int } list,
+                                 precedence : int option, rulenum : int, rulenum' : int * int } list,
                         terms: int,
                         nonterms: int,
                         start : nonterm,

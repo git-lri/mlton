@@ -13,7 +13,8 @@ structure Grammar : GRAMMAR =
                                 {rules: {lhs: nonterm,
                                          rhs: symbol list,
                                          precedence: int option,
-                                         rulenum: int} list,
+                                         rulenum: int,
+                                         rulenum': int * int} list,
                                 noshift : term list,
                                 eop : term list,
                                 terms: int,
@@ -84,7 +85,7 @@ structure IntGrammar : INTGRAMMAR =
                              fn (GRAMMAR {rules,terms,nonterms,start,...}) =>
                  let val printRule =
                         let val prRule = prRule a
-                        in  fn {lhs,rhs,precedence,rulenum} =>
+                        in  fn {lhs,rhs,precedence,rulenum, rulenum' = _} =>
                              (prRule (RULE {lhs=lhs,rhs=rhs,num=0,
                                       rulenum=rulenum, precedence=precedence});
                               print "\n")

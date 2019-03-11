@@ -37,6 +37,7 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
                             tokenStruct : string, (* Tokens{n} struct name *)
                             actionsStruct : string, (* Actions structure *)
                             valueStruct: string, (* semantic value structure *)
+                            valueMonadStruct: string, (* semantic value structure *)
                             ecStruct : string,  (* error correction structure *)
                             arg: string, (* user argument for parser *)
                             tokenSig : string,  (* TOKENS{n} signature *)
@@ -109,12 +110,17 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
         with the scope of constructors.
     *)
 
+    fun mk_name_rulenum' hasType saySym ntvoid {lhs, rulenum' = (rulenum', total), ...} =
+      (if hasType (NONTERM lhs)
+       then saySym(NONTERM lhs)
+       else ntvoid)
+      ^ (if total = 1 then "" else Int.toString rulenum')
     val printTypes1 = fn (rules,
                           VALS {term,nonterm,symbolToString,pos_type,
                                 arg_type,
                                 termvoid,ntvoid,saydot,hasType,start,
                                 pureActions,...},
-                          NAMES {valueStruct,...},
+                          NAMES {valueStruct, valueMonadStruct, ...},
                           say) =>
      let val sayln = fn t => (say t; say "\n")
 
@@ -137,9 +143,15 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
                                             else ntvoid))
          val prDestrTy = prDestr0 (fn rulen => fn constr =>
                                      "  " ^ rulen ^ " => \"" ^ (Symtab.lookup tytab constr |> the) ^ "\" |")
+         fun prDestrTy' (rule as {rulenum, ...}) = 
+           sayln ("  " ^ Int.toString rulenum ^ " => \"" ^ mk_name_rulenum' hasType saySym ntvoid rule ^ "\" |")
          val prDestr = prDestr0 (fn rulen => fn constr =>
                                    "val reduce" ^ rulen ^ " = fn " ^ 
                                      constr ^ " x => x | _ => error \"Only expecting " ^ constr ^ "\"")
+         fun prDestr' rule = 
+           sayln ("fun " ^ mk_name_rulenum' hasType saySym ntvoid rule
+                         ^ " _ = return ()")
+
      in sayln ("structure " ^ valueStruct ^ " = ");
         sayln "struct";
         say (if pureActions then
@@ -152,7 +164,15 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
         (sayln "val type_reduce = fn";
          app prDestrTy rules;
          sayln "  _ => error \"reduce type not found\"");
+        (sayln "val string_reduce = fn";
+         app prDestrTy' rules;
+         sayln "  _ => error \"reduce type not found\"");
         app prDestr rules;
+        sayln "end";
+
+        sayln ("structure " ^ valueMonadStruct ^ " = ");
+        sayln "struct";
+        app prDestr' rules;
         sayln "end"
     end
 
@@ -338,7 +358,7 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
 val printAction = fn (rules,
                           VALS {hasType,say,sayln,fmtPos,termvoid,ntvoid,
                                 symbolToString,saydot,start,pureActions,...},
-                          NAMES {actionsStruct,valueStruct,tableStruct,arg,...}) =>
+                          NAMES {actionsStruct,valueStruct,valueMonadStruct,tableStruct,arg,...}) =>
 let val printAbsynRule = Absyn.printRule(say,sayln,fmtPos)
     val is_nonterm = fn (NONTERM i) => true | _ => false
     val numberRhs = fn r =>
@@ -353,7 +373,7 @@ let val printAbsynRule = Absyn.printRule(say,sayln,fmtPos)
     val saySym = symbolToString
 
     val printCase = fn (i:int, r as {lhs=lhs as (NT lhsNum),prec,
-                                        rhs,code=code0,rulenum}) =>
+                                        rhs,code=code0,rulenum,rulenum'}) =>
 
        (* mkToken: Build an argument *)
 
@@ -397,7 +417,7 @@ let val printAbsynRule = Absyn.printRule(say,sayln,fmtPos)
 
            val defaultPos = EVAR "defaultPos"
            val explicit_monad = case explode (#text code0) of #"(" :: #"*" :: #"%" :: #"*" :: #")" :: _ => true | _ => false
-           val resultexp = if pureActions andalso not explicit_monad then EAPP (EVAR "return", EVAR "result") else EVAR "result"
+           val resultexp = EVAR "result"
            val resultpat = PVAR "result"
            val code = CODE code0
            val rest = EVAR "rest671"
@@ -405,15 +425,15 @@ let val printAbsynRule = Absyn.printRule(say,sayln,fmtPos)
                                  (if hasType (NONTERM lhs)
                                       then saySym(NONTERM lhs)
                                       else ntvoid))
+           val cons_name_monad = EVAR(valueMonadStruct^"."^ mk_name_rulenum' hasType saySym ntvoid r)
 
            val body =
              LET([VB(resultpat,
-                   if pureActions andalso explicit_monad
-                     then EAPP (EVAR "op #>>", ETUPLE [code, cons_name])
+                   if pureActions
+                     then EAPP (EVAR "op #>>", ETUPLE [EAPP (EAPP (EVAR "bind'", if explicit_monad then code else EAPP (EVAR "return", code)), cons_name_monad), cons_name])
                      else
                        EAPP(cons_name,
-                          if pureActions then code
-                          else if argsWithTypes=nil then FN(WILD,code)
+                          if argsWithTypes=nil then FN(WILD,code)
                           else
                            FN(WILD,
                              let val body =
@@ -481,7 +501,7 @@ let val printAbsynRule = Absyn.printRule(say,sayln,fmtPos)
     val make_parser = fn ((header,
          DECL {eop,change,keyword,nonterm,prec,
                term, control,value} : declData,
-               rules : rule list),spec,error : pos -> string -> unit,
+               rules : rule list list),spec,error : pos -> string -> unit,
                wasError : unit -> bool) =>
      let
         val verbose = List.exists (fn VERBOSE=>true | _ => false) control
@@ -660,13 +680,20 @@ let val printAbsynRule = Absyn.printRule(say,sayln,fmtPos)
                val nontermNum = nontermNum "rule"
                val termNum = termNum "%prec tag"
            in List.foldr
-           (fn (RULE {lhs,rhs,code,prec},(l,n)) =>
-             ( {lhs=nontermNum lhs,rhs=map symbolNum rhs,
-                code=code,prec=case prec
-                                of NONE => NONE
-                                 | SOME t => SOME (termNum t),
-                 rulenum=n}::l,n-1))
-                 (nil,length rules-1) rules
+                 (fn (rules, acc) =>
+                   let val len = length rules in
+                     List.foldr (fn ((RULE {lhs,rhs,code,prec},((l,n),n'))) =>
+                                  (({lhs=nontermNum lhs,rhs=map symbolNum rhs,
+                                     code=code,prec=case prec
+                                                     of NONE => NONE
+                                                      | SOME t => SOME (termNum t),
+                                     rulenum=n, rulenum' = (n', len)} :: l, n - 1), n' - 1))
+                                (acc, len)
+                                rules
+                     |> #1
+                   end)
+                 (nil, fold (curry op +) (map length rules) ~1)
+                 rules
         end
 
         val _ = if wasError() then raise Semantic else ()
@@ -766,14 +793,14 @@ precedences of the rule and the terminal are equal.
            end
 
         val grammarRules =
-          let val conv = fn {lhs,rhs,code,prec,rulenum} =>
+          let val conv = fn {lhs,rhs,code,prec,rulenum,rulenum'} =>
                 {lhs=lhs,rhs =rhs,precedence=
                         case prec
                           of SOME t => (case termPrec t
                                         of SOME i => SOME(elimAssoc i)
                                          | a => a)
                            | _ => rulePrec rhs,
-                 rulenum=rulenum}
+                 rulenum=rulenum, rulenum' = rulenum'}
           in map conv rules
           end
 
@@ -821,6 +848,7 @@ precedences of the rule and the terminal are equal.
 
         val names = NAMES {miscStruct=name' ^ "LrValsFun",
                            valueStruct="MlyValue",
+                           valueMonadStruct="MlyValueM",
                            tableStruct="LrTable",
                            tokenStruct="Tokens",
                            actionsStruct="Actions",
@@ -920,7 +948,7 @@ precedences of the rule and the terminal are equal.
              val printRule =
                 let val rules = Array.fromList grammarRules
                 in fn say =>
-                   let val prRule = fn {lhs,rhs,precedence,rulenum} =>
+                   let val prRule = fn {lhs,rhs,precedence,rulenum,rulenum'} =>
                      ((say o nontermToString) lhs; say " : ";
                       app (fn s => (say (symbolToString s); say " ")) rhs)
                    in fn i => prRule (rules sub i)

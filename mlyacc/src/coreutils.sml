@@ -27,7 +27,7 @@ functor mkCoreUtils(structure Core : CORE) : CORE_UTILS =
    in their lhs nonterminal *)
 
                val _ =
-                 let val f = fn {lhs=lhs as (NT n), rhs, precedence,rulenum} =>
+                 let val f = fn {lhs=lhs as (NT n), rhs, precedence, rulenum, rulenum' = _} =>
                         let val rule=RULE{lhs=lhs,rhs=rhs,precedence=precedence,
                                           rulenum=rulenum,num=0}
                         in Array.update(derives,n,rule::(derives sub n))

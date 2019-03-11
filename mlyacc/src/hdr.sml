@@ -70,7 +70,7 @@ functor HeaderFun () : HEADER =
                                  code : {text : string, pos : pos},
                                  prec : symbol option}
 
-        type parseResult = string * declData * rule list
+        type parseResult = string * declData * rule list list
         val getResult = fn p => p
 
         fun join_decls
