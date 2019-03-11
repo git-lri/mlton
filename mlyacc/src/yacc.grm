@@ -1,3 +1,7 @@
+(* Modified by Frédéric Tuong
+ * Generation of Language.C Grammar with ML Interface Binding
+ * (c) 2018-2019 Université Paris-Saclay, Univ. Paris-Sud, France
+ *)
 (* Modified by Vesa Karvonen on 2007-12-18.
  * Create line directives in output.
  *)
