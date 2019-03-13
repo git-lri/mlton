@@ -141,10 +141,10 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
                                 " (" ^ tyName s ^ ")"
                                 )
                          | _ => ()
-         fun prDestr0 f {lhs, rulenum, ...} =
-           sayln (f (Int.toString rulenum) (if hasType (NONTERM lhs)
-                                            then saySym(NONTERM lhs)
-                                            else ntvoid))
+         fun prDestr0' lhs = if hasType (NONTERM lhs)
+                             then saySym(NONTERM lhs)
+                             else ntvoid
+         fun prDestr0 f {lhs, rulenum, ...} = sayln (f (Int.toString rulenum) (prDestr0' lhs))
          val prDestrTy = prDestr0 (fn rulen => fn constr =>
                                      "  " ^ rulen ^ " => \"" ^ (Symtab.lookup tytab constr |> the) ^ "\" |")
          fun prDestrTy' (rule as {rulenum, ...}) = 
@@ -153,8 +153,10 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
                                    "val reduce" ^ rulen ^ " = fn " ^ 
                                      constr ^ " x => x | _ => error \"Only expecting " ^ constr ^ "\"")
          fun prDestr' rule = 
-           sayln ("fun " ^ mk_name_rulenum' hasType saySym ntvoid rule
-                         ^ " _ = return ()")
+           sayln ("val " ^ mk_name_rulenum' hasType saySym ntvoid rule
+                         ^ " :"
+                         ^ the (Symtab.lookup tytab (prDestr0' (#lhs rule)))
+                         ^ " -> unit monad = update_env (fn _ => fn env => fn context => (env, context))")
 
      in sayln ("structure " ^ valueStruct ^ " = ");
         sayln "struct";
@@ -176,6 +178,7 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
 
         sayln ("structure " ^ valueMonadStruct ^ " = ");
         sayln "struct";
+        sayln "fun update_env _ = K (return ())";
         app prDestr' rules;
         sayln "end"
     end
