@@ -129,71 +129,55 @@ functor mkPrintStruct(structure LrTable : LR_TABLE
            print "=";
            print "let val actionRows =\n";
            printTable(printActionRow,rowCount);
-           print "val actionRowNumbers =\n\"";
+           print "  val actionRowNumbers =\n\"";
            printList (fn i => printInt i) rowNumbers;
            print "\"\n";
-           print "val gotoT =\n";
+           print "  val gotoT =\n";
            printTable(printGotoRow,states);
-           print "val numstates = ";
+           print "  val numstates = ";
            print (Int.toString states);
-           print "\nval numrules = ";
+           print "\n  val numrules = ";
            print (Int.toString rules);
            print "\n\
-\open Unsynchronized\n\
-\val s = ref \"\" and index = ref 0\n\
-\val string_to_int = fn () => \n\
-\let val i = !index\n\
-\in index := i+2; Char.ord(String.sub(!s,i)) + Char.ord(String.sub(!s,i+1)) * 256\n\
-\end\n\
-\val string_to_list = fn s' =>\n\
-\    let val len = String.size s'\n\
-\        fun f () =\n\
-\           if !index < len then string_to_int() :: f()\n\
-\           else nil\n\
-\   in index := 0; s := s'; f ()\n\
-\   end\n\
-\val string_to_pairlist = fn (conv_key,conv_entry) =>\n\
-\     let fun f () =\n\
-\         case string_to_int()\n\
-\         of 0 => EMPTY\n\
-\          | n => PAIR(conv_key (n-1),conv_entry (string_to_int()),f())\n\
-\     in f\n\
-\     end\n\
-\val string_to_pairlist_default = fn (conv_key,conv_entry) =>\n\
-\    let val conv_row = string_to_pairlist(conv_key,conv_entry)\n\
-\    in fn () =>\n\
-\       let val default = conv_entry(string_to_int())\n\
-\           val row = conv_row()\n\
-\       in (row,default)\n\
-\       end\n\
-\   end\n\
-\val string_to_table = fn (convert_row,s') =>\n\
-\    let val len = String.size s'\n\
-\        fun f ()=\n\
-\           if !index < len then convert_row() :: f()\n\
-\           else nil\n\
-\     in (s := s'; index := 0; f ())\n\
-\     end\n\
-\local\n\
-\  val memo = Array.array(numstates+numrules,ERROR)\n\
-\  val _ =let fun g i=(Array.update(memo,i,REDUCE(i-numstates)); g(i+1))\n\
-\       fun f i =\n\
-\            if i=numstates then g i\n\
-\            else (Array.update(memo,i,SHIFT (STATE i)); f (i+1))\n\
-\          in f 0 handle General.Subscript => ()\n\
-\          end\n\
+\  datatype acc = Acc of string * int\n\
+\\n\
+\  fun string_to_int (Acc (s, i)) =\n\
+\    (Char.ord (String.sub (s, i)) + Char.ord (String.sub (s, i + 1)) * 256, Acc (s, i + 2))\n\
+\\n\
+\  fun string_to_table string_to s =\n\
+\    let val len = String.size s\n\
+\        fun f (Acc (s, index)) = (Acc (s, index)) |> (if index < len then (string_to ::: f)\n\
+\                                                      else Scan.succeed nil)\n\
+\    in Acc (s, 0) |> f |> fst end\n\
+\\n\
+\  fun string_to_pairlist conv_key conv_entry =\n\
+\    let fun f acc = acc |>\n\
+\      (string_to_int\n\
+\       :|-- (fn 0 => Scan.succeed EMPTY\n\
+\              | n => string_to_int -- f >> (fn (i, xs) => PAIR (conv_key (n - 1), conv_entry i, xs))))\n\
+\    in f end\n\
+\\n\
+\  fun string_to_pairlist_T conv_entry =\n\
+\    string_to_int -- string_to_pairlist T conv_entry >> (swap #> apsnd conv_entry)\n\
+\\n\
+\  local\n\
+\    val memo = Array.array (numstates + numrules, ERROR)\n\
+\    val _ = let fun g i = (Array.update (memo, i, REDUCE (i - numstates)); g (i + 1))\n\
+\                fun f i = if i = numstates then g i\n\
+\                          else (Array.update (memo, i, SHIFT (STATE i)); f (i + 1))\n\
+\            in f 0 handle General.Subscript => () end\n\
+\  in val entry_to_action = fn 0 => ACCEPT | 1 => ERROR | j => Array.sub (memo, j - 2) end\n\
 \in\n\
-\val entry_to_action = fn 0 => ACCEPT | 1 => ERROR | j => Array.sub(memo,(j-2))\n\
-\end\n\
-\val gotoT=Array.fromList(string_to_table(string_to_pairlist(NT,STATE),gotoT))\n\
-\val actionRows=string_to_table(string_to_pairlist_default(T,entry_to_action),actionRows)\n\
-\val actionRowNumbers = string_to_list actionRowNumbers\n\
-\val actionT = let val actionRowLookUp=\n\
-\let val a=Array.fromList(actionRows) in fn i=>Array.sub(a,i) end\n\
-\in Array.fromList(List.map actionRowLookUp actionRowNumbers)\n\
-\end\n\
-\in LrTable.mkLrTable {actions=actionT,gotos=gotoT,numRules=numrules,\n\
-\numStates=numstates,initialState=STATE ";
+\  LrTable.mkLrTable\n\
+\    {actions =\n\
+\      Array.fromList\n\
+\       (map (curry Array.sub (Array.fromList (string_to_table (string_to_pairlist_T entry_to_action)\n\
+\                                                              actionRows)))\n\
+\            (string_to_table string_to_int actionRowNumbers)),\n\
+\     gotos = Array.fromList (string_to_table (string_to_pairlist NT STATE) gotoT),\n\
+\     numRules = numrules,\n\
+\     numStates = numstates,\n\
+\     initialState = STATE ";
 print (Int.toString ((fn (STATE i) => i) (initialState table)));
 print "}\nend\n";
       entries
