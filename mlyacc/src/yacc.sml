@@ -853,10 +853,10 @@ precedences of the rule and the terminal are equal.
                     of NONE => ""
                      | SOME s => symbolName s
 
-        val names = NAMES {miscStruct=name' ^ "LrValsFun",
-                           valueStruct="MlyValue",
-                           valueMonadStruct="MlyValueM",
-                           tableStruct="LrTable",
+        val names = NAMES {miscStruct=name' ^ "_Fun",
+                           valueStruct=name' ^ "_Rule",
+                           valueMonadStruct=name' ^ "_Rule_Wrap",
+                           tableStruct="LALR_Table",
                            tokenStruct="Tokens",
                            actionsStruct="Actions",
                            ecStruct="EC",
@@ -931,9 +931,9 @@ precedences of the rule and the terminal are equal.
             sayln "end";
             sayln ("structure " ^ dataStruct ^ "=");
             sayln "struct";
-            sayln "structure LrTable = Token.LrTable";
+            sayln "structure LALR_Table = Token.LALR_Table";
             sayln "structure Token = Token";
-            sayln "local open LrTable in ";
+            sayln "local open LALR_Table in ";
             entries := PrintStruct.makeStruct{table=table,print=say,
                                               name = "table",
                                               verbose=verbose};

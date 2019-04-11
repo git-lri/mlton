@@ -168,7 +168,7 @@ functor mkPrintStruct(structure LrTable : LR_TABLE
 \            in f 0 handle General.Subscript => () end\n\
 \  in val entry_to_action = fn 0 => ACCEPT | 1 => ERROR | j => Array.sub (memo, j - 2) end\n\
 \in\n\
-\  LrTable.mkLrTable\n\
+\  LALR_Table.mkLrTable\n\
 \    {actions =\n\
 \      Array.fromList\n\
 \       (map (curry Array.sub (Array.fromList (string_to_table (string_to_pairlist_T entry_to_action)\n\
