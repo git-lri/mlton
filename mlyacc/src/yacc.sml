@@ -125,7 +125,7 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
                                 termvoid,ntvoid,saydot,hasType,start,
                                 pureActions,...},
                           NAMES {valueStruct, valueMonadStruct, ...},
-                          say) =>
+                          say, fmtPos, header) =>
      let val sayln = fn t => (say t; say "\n")
 
          val addConstr = fn (symbol,SOME s) =>
@@ -160,6 +160,9 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
 
      in sayln ("structure " ^ valueStruct ^ " = ");
         sayln "struct";
+        say (fmtPos (SOME {line = 1, col = 1}));
+        sayln header;
+        say (fmtPos NONE);
         say (if pureActions then
                "datatype svalue0 = " ^ termvoid ^ " | " ^ ntvoid ^ " of unit"
              else
@@ -178,6 +181,9 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
 
         sayln ("structure " ^ valueMonadStruct ^ " = ");
         sayln "struct";
+        say (fmtPos (SOME {line = 1, col = 1}));
+        sayln header;
+        say (fmtPos NONE);
         sayln "fun update_env _ = K (return ())";
         app prDestr' rules;
         sayln "end"
@@ -251,8 +257,8 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
                         values as VALS {term,tokenInfo,pureActions,...},
                         names as NAMES {tokenSig,tokenStruct,miscSig,
                                         dataStruct, dataSig, ...},
-                        say) =>
-      let in printTypes1 (rules, values, names, say);
+                        say, fmtPos, header) =>
+      let in printTypes1 (rules, values, names, say, fmtPos, header);
           say  ("signature " ^ tokenSig ^ " =\nsig\n"^
                 (case tokenInfo of NONE => "" | SOME s => (s^"\n"))^
                 "type ('a,'b) token\n"^
@@ -944,7 +950,7 @@ precedences of the rule and the terminal are equal.
             sayln "end";
             printTokenStruct(values,names);
             sayln "end";
-            printSigs(rules,values,names,fn s => TextIO.output(sigs,s));
+            printSigs(rules,values,names,fn s => TextIO.output(sigs,s), fmtPos, header);
             TextIO.closeOut sigs;
             TextIO.closeOut result;
             MakeTable.Errs.printSummary (fn s => TextIO.output(TextIO.stdOut,s)) errs
