@@ -145,10 +145,14 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
                              then saySym(NONTERM lhs)
                              else ntvoid
          fun prDestr0 f {lhs, rulenum, ...} = sayln (f (Int.toString rulenum) (prDestr0' lhs))
-         val prDestrTy = prDestr0 (fn rulen => fn constr =>
-                                     "  " ^ rulen ^ " => \"" ^ (Symtab.lookup tytab constr |> the) ^ "\" |")
-         fun prDestrTy' (rule as {rulenum, ...}) = 
-           sayln ("  " ^ Int.toString rulenum ^ " => \"" ^ mk_name_rulenum' hasType saySym ntvoid rule ^ "\" |")
+         fun prDestrTy {lhs, rulenum' = (rulen, total), ...} =
+           if rulen = 1
+           then sayln ("  (\"" ^ (Symtab.lookup tytab (prDestr0' lhs) |> the) ^ "\", " ^ Int.toString total ^ "),")
+           else ()
+         fun prDestrTy' {lhs, rulenum' = (rulen, total), ...} =
+           if rulen = 1
+           then sayln ("  (\"" ^ prDestr0' lhs ^ "\", " ^ Int.toString total ^ "),")
+           else ()
          val prDestr = prDestr0 (fn rulen => fn constr =>
                                    "val reduce" ^ rulen ^ " = fn " ^ 
                                      constr ^ " x => x | _ => error \"Only expecting " ^ constr ^ "\"")
@@ -169,13 +173,25 @@ functor ParseGenFun(structure ParseGenParser : PARSE_GEN_PARSER
                "datatype svalue = " ^ termvoid ^ " | " ^ ntvoid ^ " of unit -> unit");
         app prConstr term;
         app prConstr nonterm;
-        sayln "";
-        (sayln "val type_reduce = fn";
+        app sayln [ ""
+                  , "fun find_list msg mk_name l ="
+                  , "  let val tab ="
+                  , "        fold (fn (name, occ) =>"
+                  , "               fold (fn name => fn (tab, nb) => (Inttab.update (nb, name) tab, nb + 1))"
+                  , "                    (if occ = 1 then [name]"
+                  , "                                else map_range (mk_name name) occ))"
+                  , "             l"
+                  , "             (Inttab.empty, 0)"
+                  , "        |> #1"
+                  , "  in"
+                  , "    fn i => case Inttab.lookup tab i of NONE => error msg | SOME name => name"
+                  , "  end" ];
+        (sayln "val type_reduce = find_list \"reduce type not found\" K [";
          app prDestrTy rules;
-         sayln "  _ => error \"reduce type not found\"");
-        (sayln "val string_reduce = fn";
+         sayln "  (\"\", 0)]");
+        (sayln "val string_reduce = find_list \"reduce type not found\" (fn name => fn occ => name ^ Int.toString (occ + 1)) [";
          app prDestrTy' rules;
-         sayln "  _ => error \"reduce type not found\"");
+         sayln "  (\"\", 0)]");
         app prDestr rules;
         sayln "end";
 
