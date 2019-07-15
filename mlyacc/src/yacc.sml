@@ -1,5 +1,5 @@
 (* Modified by Frédéric Tuong
- * Generation of Language.C Grammar with ML Interface Binding
+ * Isabelle/C
  * (c) 2018-2019 Université Paris-Saclay, Univ. Paris-Sud, France
  *)
 (* Modified by Matthew Fluet on 2011-06-17.
