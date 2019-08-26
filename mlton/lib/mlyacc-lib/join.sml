@@ -77,7 +77,7 @@ struct
 
     type stack = (Token.LALR_Table.state, svalue0, pos) C_Env.stack'
 
-    type 'arg lexer = ((svalue, pos) Token.token, stack * 'arg) Stream.stream * 'arg
+    type ('arg1, 'arg2) lexer = ((svalue, pos) Token.token, stack * 'arg1) Stream.stream * 'arg2
 
     val makeLexer = LrParser.Stream.streamify Lex.makeLexer
 

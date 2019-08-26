@@ -106,7 +106,7 @@ signature LR_PARSER1 =
 
         type ('_b, '_c) stack = (LALR_Table.state, '_b, '_c) C_Env.stack'
 
-        type ('_b, '_c, 'arg) lexer = (('arg -> '_b * 'arg,'_c) Token.token, ('_b, '_c) stack * 'arg) Stream.stream * 'arg
+        type ('_b, '_c, 'arg1, 'arg2) lexer = (('arg1 -> '_b * 'arg1,'_c) Token.token, ('_b, '_c) stack * 'arg1) Stream.stream * 'arg2
 
         val parse : {table : LALR_Table.table,
                      saction : int *
@@ -119,7 +119,7 @@ signature LR_PARSER1 =
                      void : 'arg -> '_b * 'arg,
                      void_position : '_c,
                      start : ('arg -> '_b * 'arg, '_c) Token.token,
-                     accept : '_c * '_c -> ('_b, '_c) stack * 'arg -> 'arg,
+                     accept : '_c * '_c -> ('_b, '_c) stack * 'arg -> 'user * 'arg,
                      reduce_init : (('_c * '_c) list * int) * 'arg -> 'arg,
                      reduce_get : (LALR_Table.state, '_b, '_c) C_Env.rule_reduce -> 'arg -> (LALR_Table.state, '_b, '_c) C_Env.rule_output0 * 'arg,
                      ec : { is_keyword : LALR_Table.term -> bool,
@@ -128,13 +128,13 @@ signature LR_PARSER1 =
                             errtermvalue : LALR_Table.term -> 'arg -> '_b * 'arg,
                             showTerminal : LALR_Table.term -> string,
                             terms: LALR_Table.term list,
-                            error : '_c * '_c -> ('_b, '_c) stack * 'arg -> 'arg
+                            error : '_c * '_c -> ('_b, '_c) stack * 'arg -> 'user * 'arg
                            },
                      lookahead : int  (* max amount of lookahead used in *)
                                       (* error correction *)
                     }
-                    -> ('_b, '_c, 'arg) lexer
-                    -> ('_b, '_c, 'arg) lexer
+                    -> ('_b, '_c, 'arg, 'arg) lexer
+                    -> ('_b, '_c, 'arg, 'user * 'arg) lexer
     end
 
 signature LR_PARSER2 =
@@ -395,18 +395,18 @@ signature ARG_PARSER1 =
 
         type stack = (Token.LALR_Table.state, svalue0, pos) C_Env.stack'
 
-        type 'arg lexer = ((svalue, pos) Token.token, stack * 'arg) Stream.stream * 'arg
+        type ('arg1, 'arg2) lexer = ((svalue, pos) Token.token, stack * 'arg1) Stream.stream * 'arg2
 
-        val makeLexer : arg -> arg lexer
+        val makeLexer : arg -> (arg, arg) lexer
         val parse :   int
-                    * (pos * pos -> stack * arg -> arg)
+                    * (pos * pos -> stack * arg -> 'user * arg)
                     * pos
                     * (svalue, pos) Token.token
-                    * (pos * pos -> stack * arg -> arg)
+                    * (pos * pos -> stack * arg -> 'user * arg)
                     * (((pos * pos) list * int) * arg -> arg)
                     * ((Token.LALR_Table.state, svalue0, pos) C_Env.rule_reduce -> arg -> (Token.LALR_Table.state, svalue0, pos) C_Env.rule_output0 * arg)
-                   -> arg lexer
-                   -> arg lexer
+                   -> (arg, arg) lexer
+                   -> (arg, 'user * arg) lexer
         val sameToken : (svalue, pos) Token.token * (svalue, pos) Token.token -> bool
      end
 

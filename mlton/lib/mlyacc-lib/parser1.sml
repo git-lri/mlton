@@ -35,7 +35,7 @@ type ('a,'b) stack0 = (state * ('a * 'b * 'b)) list
 
 type ('_b, '_c) stack = (LALR_Table.state, '_b, '_c) C_Env.stack'
 
-type ('_b, '_c, 'arg) lexer = (('arg -> '_b * 'arg,'_c) Token.token, ('_b, '_c) stack * 'arg) Stream.stream * 'arg
+type ('_b, '_c, 'arg1, 'arg2) lexer = (('arg1 -> '_b * 'arg1,'_c) Token.token, ('_b, '_c) stack * 'arg1) Stream.stream * 'arg2
 
 val showState = fn (STATE s) => "STATE " ^ Int.toString s
 
