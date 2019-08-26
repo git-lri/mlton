@@ -47,7 +47,7 @@ fun printStack(stack: ('a,'b) stack0, n: int) =
            )
       | nil => ()
 
-fun parse {table, saction, void, void_position, accept, reduce_init, reduce_get, ec = {showTerminal, error, ...}, ...} =
+fun parse {table, saction, void, void_position, start, accept, reduce_init, reduce_get, ec = {showTerminal, error, ...}, ...} =
   let fun empty_tree rule_pos rule_type =
         C_Env.Tree ({rule_pos = rule_pos, rule_type = rule_type}, [])
 
@@ -123,7 +123,7 @@ fun parse {table, saction, void, void_position, accept, reduce_init, reduce_get,
                                        ([], [])
                                        ((void_position, void_position), [])
                                        (empty_tree (void_position, void_position) C_Env.Void, [])))
-     #> Stream.get 
+     #> pair start
      #> parseStep 
 end
 

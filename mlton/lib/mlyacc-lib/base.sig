@@ -118,6 +118,7 @@ signature LR_PARSER1 =
                                      (LALR_Table.state * ('_b * '_c * '_c)) list,
                      void : 'arg -> '_b * 'arg,
                      void_position : '_c,
+                     start : ('arg -> '_b * 'arg, '_c) Token.token,
                      accept : '_c * '_c -> ('_b, '_c) stack * 'arg -> 'arg,
                      reduce_init : (('_c * '_c) list * int) * 'arg -> 'arg,
                      reduce_get : (LALR_Table.state, '_b, '_c) C_Env.rule_reduce -> 'arg -> (LALR_Table.state, '_b, '_c) C_Env.rule_output0 * 'arg,
@@ -400,6 +401,7 @@ signature ARG_PARSER1 =
         val parse :   int
                     * (pos * pos -> stack * arg -> arg)
                     * pos
+                    * (svalue, pos) Token.token
                     * (pos * pos -> stack * arg -> arg)
                     * (((pos * pos) list * int) * arg -> arg)
                     * ((Token.LALR_Table.state, svalue0, pos) C_Env.rule_reduce -> arg -> (Token.LALR_Table.state, svalue0, pos) C_Env.rule_output0 * arg)
